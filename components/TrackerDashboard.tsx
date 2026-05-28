@@ -1,12 +1,13 @@
 "use client";
 
 import { AlertTriangle, Database, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SearchForm } from "@/components/SearchForm";
 import { ResultsTable } from "@/components/ResultsTable";
+import { SavedSearches } from "@/components/SavedSearches";
 import { SummaryCards } from "@/components/SummaryCards";
 import { Badge } from "@/components/ui/badge";
-import type { SearchRequest, SearchResponse } from "@/lib/types";
+import type { SavedSearchRunsResponse, SearchRequest, SearchResponse } from "@/lib/types";
 
 function csvValue(value: unknown) {
   const stringValue = String(value ?? "");
@@ -64,8 +65,32 @@ function downloadCsv(response: SearchResponse) {
 
 export function TrackerDashboard() {
   const [response, setResponse] = useState<SearchResponse | null>(null);
+  const [history, setHistory] = useState<SavedSearchRunsResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadHistory() {
+    setHistoryLoading(true);
+
+    try {
+      const result = await fetch("/api/search-runs?limit=12", {
+        method: "GET",
+        cache: "no-store"
+      });
+      const data = await result.json();
+
+      if (result.ok) {
+        setHistory(data);
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadHistory();
+  }, []);
 
   async function handleSearch(payload: SearchRequest) {
     setLoading(true);
@@ -85,6 +110,7 @@ export function TrackerDashboard() {
       }
 
       setResponse(data);
+      void loadHistory();
     } catch (searchError) {
       setError(searchError instanceof Error ? searchError.message : "Search failed.");
       setResponse(null);
@@ -116,6 +142,7 @@ export function TrackerDashboard() {
 
         <div className="grid gap-6">
           <SearchForm loading={loading} onSearch={handleSearch} />
+          <SavedSearches history={history} loading={historyLoading} />
 
           <section className="grid content-start gap-4">
             <SummaryCards summary={response?.summary} />
